@@ -1,0 +1,151 @@
+---
+title: 'competition_based'
+format: dashboard
+editor: source
+theme: 
+    - yeti
+author: "Nisira Yevin"
+---
+
+```{r}
+#| label: load-packages
+#| message: false
+#| warning: false
+library(readxl)
+library(ggplot2)
+library(tidyverse)
+library(scales)
+library(RColorBrewer)
+library(plotly)
+library(GGally)
+library(crosstalk)
+library(lubridate)
+```
+```{r}
+#| label: load-data
+#| message: false
+#| warning: false
+# Loading Excel
+dataset <- read_excel("dataset1.xlsx")
+```
+
+
+# Time Based Analysis
+```{r}
+#| label: setup-df
+df <-dataset |>
+  mutate(Month = factor(Month, levels = c("January","February","March","April",
+                                          "May","June","July","August","September",
+                                          "October","November","December"), ordered = TRUE))
+```
+## row {height="50%"}
+```{r}
+#| label: ticket-by-month
+#| title: "Total Tickets by Month"
+#| dependson: "setup-df"
+ticket_month <- df |>
+  group_by(Month) |>
+  summarise(total_tickets = sum(num_tickets), .groups = "drop")
+
+
+T1 <- ggplot(ticket_month, aes(x = Month, y = total_tickets, fill = Month)) + 
+  geom_bar(stat = "identity") +
+  scale_fill_viridis_d(option = "cividis",direction = 1) +
+  labs(title = "Total Tickets by Month",
+       x = "Month",
+       y = "Ticket Count") +
+  theme_minimal() +
+  theme(legend.position = "none")
+ggplotly(T1)
+```
+
+```{r}
+#| label: Revenue-by-month
+#| title: Revenue by Month
+
+revenue_month <- df |>
+  group_by(Month) |>
+  summarise(Revenue = sum(TotalRevenue, na.rm = TRUE), .groups = "drop")
+
+T2 <- ggplot(revenue_month, aes(x = Month, y = Revenue, fill = Month,text = paste("Month:", Month,"<br>Revenue:", scales::comma(Revenue)))) +
+  geom_col() +
+  scale_fill_viridis_d(option = "cividis", direction = 1) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title = "Revenue by Month",
+       x = "Month",
+       y = "Total Revenue") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+ggplotly(T2, tooltip = "text")
+```
+
+
+```{r}
+#| label: country-by-month
+#| title: "Number of Tickets sold by Country and Month"
+# Country by month
+T3 <- df |>
+  group_by(Month, country) |>
+  summarise(count = n(), .groups = "drop") |>
+  ggplot(aes(x = Month, y = count, fill = country)) +
+  geom_col(position = "dodge") +
+  scale_fill_viridis_d(option = "set3") +
+  theme_minimal()
+
+ggplotly(T3)
+```
+
+## Row 
+```{r}
+#| label: repeat-visit-by-month
+#| title: "Repeat Visit Status by Month"
+T4 <- df |>
+  group_by(Month, repeat_visit) |>
+  summarise(count = n(), .groups = "drop") |>
+  arrange(Month, repeat_visit) |>
+  ggplot(aes(x = Month, y = count, fill = repeat_visit, text = count)) +
+  theme_minimal() +
+  geom_col()
+
+ggplotly(T4)
+```
+```{r}
+#| label: age-group-by-month
+#| title: "Age Group Distribution by Month"
+# Age group by month
+T5 <- df |>
+  group_by(Month, age_category) |>
+  summarise(count = n(), .groups = "drop") |>
+  arrange(Month, age_category) |>
+  ggplot(aes(x = Month, y = count, fill = age_category, text = count)) +
+  theme_minimal() +
+  geom_col()
+
+ggplotly(T5)
+```
+```{r}
+#| label: repeat-customers-satisfaction
+#| title: "Repeat Customers & Avg Satisfaction by Month"
+#| dependson: "setup-df"
+
+monthly_summary <- df |>
+  group_by(Month) |>
+  summarise(
+    repeat_customers = sum(repeat_visit == "Yes"),
+    avg_satisfaction  = round(mean(satisfaction_score, na.rm = TRUE), 2),
+    .groups = "drop"
+  )
+
+plot_ly(data = monthly_summary, x = ~Month) |>
+  add_trace(y = ~repeat_customers, name = "Repeat Customers",
+            type = "bar", yaxis = "y1") |>
+  add_trace(y = ~avg_satisfaction, name = "Avg Satisfaction",
+            type = "scatter", mode = "lines+markers", yaxis = "y2") |>
+  layout(
+    xaxis  = list(title = "Month"),
+    yaxis  = list(title = "Repeat Customers", side = "left"),
+    yaxis2 = list(title = "Avg Satisfaction Score", side = "right",overlaying = "y", range = c(0, 10)),
+    legend = list(x = 0.01, y = 0.99)
+  )
+```
